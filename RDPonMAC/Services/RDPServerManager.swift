@@ -125,9 +125,13 @@ final class RDPServerManager: ObservableObject {
         // Initialize surface with a blue placeholder frame so clients can connect
         // even before screen capture starts
         if let server = self.server {
-            // Match the capture resolution we configure in ScreenCaptureService.
-            let pw: UInt32 = 1920
-            let ph: UInt32 = 1080
+            // Match the capture resolution we configure in ScreenCaptureService:
+            // native pixels of the primary display. The tile-based delivery
+            // path in RDPxRDPListener handles the PDU budget, so we no longer
+            // need to clamp to 1920×1080.
+            let mainDisplay = CGMainDisplayID()
+            let pw = UInt32(CGDisplayPixelsWide(mainDisplay))
+            let ph = UInt32(CGDisplayPixelsHigh(mainDisplay))
             let pstride = pw * 4
             var blueFrame = [UInt8](repeating: 0, count: Int(ph * pstride))
             // Fill with dark blue (BGRX format)
@@ -169,11 +173,18 @@ final class RDPServerManager: ObservableObject {
         // Start audio capture
         audioCaptureService.start()
 
-        // Configure input injection for primary monitor
+        // Configure input injection for primary monitor. Tell the input
+        // service the same RDP coordinate space we capture in (native pixels)
+        // so its remote→display scaling matches.
         if let primary = MonitorService.getPrimaryMonitor() {
+            let mainDisplay = CGMainDisplayID()
+            let nativeW = CGFloat(CGDisplayPixelsWide(mainDisplay))
+            let nativeH = CGFloat(CGDisplayPixelsHigh(mainDisplay))
             inputInjection.configure(
                 displayBounds: MonitorService.getDisplayBounds(for: primary),
-                scaleFactor: primary.scaleFactor
+                scaleFactor: primary.scaleFactor,
+                remoteWidth: nativeW,
+                remoteHeight: nativeH
             )
         }
 

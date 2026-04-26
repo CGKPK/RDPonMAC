@@ -108,12 +108,16 @@ int rdpmac_authenticate(const char* user, const char* domain, const char* passwo
 
 void rdpmac_get_primary_display_size(uint32_t* outWidth, uint32_t* outHeight)
 {
-    // Report a fixed 1920x1080 — matches what ScreenCaptureService.swift
-    // configures the SCStream with. mstsc's slow-path bitmap decoder can't
-    // keep up with full Retina, but 1920x1080 is readable on hi-DPI clients
-    // and ScreenCaptureKit downscales the display for us.
-    if (outWidth)  *outWidth  = 1920;
-    if (outHeight) *outHeight = 1080;
+    // Report the primary display's native pixel resolution. This matches
+    // what ScreenCaptureService.swift configures the SCStream with, so the
+    // dimensions libxrdp negotiates with the client line up exactly with
+    // the buffer we feed into rdpmac_listener_push_frame.
+    CGDirectDisplayID mainDisplay = CGMainDisplayID();
+    size_t w = CGDisplayPixelsWide(mainDisplay);
+    size_t h = CGDisplayPixelsHigh(mainDisplay);
+    if (w == 0 || h == 0) { w = 1920; h = 1080; }
+    if (outWidth)  *outWidth  = (uint32_t)w;
+    if (outHeight) *outHeight = (uint32_t)h;
 }
 
 // ----------------------------------------------------------------------------

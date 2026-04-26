@@ -46,16 +46,13 @@ final class ScreenCaptureService: NSObject {
             targetDisplay = mainDisplay
         }
 
-        // Capture at 1920×1080 — readable on a hi-DPI client window without
-        // blowing through mstsc's slow-path bitmap-update budget. Each row
-        // becomes a ~16KB PDU, so 1080 rows × 5 FPS = ~5400 PDUs/s, which
-        // mstsc still handles. Native Retina 2560×1440 (~1440 rows) caused
-        // a guaranteed disconnect; logical 1280×720 worked but rendered too
-        // small to read text. Phase 8 (RemoteFX) lifts this restriction.
-        // ScreenCaptureKit downscales the display content to the requested
-        // size, preserving aspect by default.
-        let captureWidth = 1920
-        let captureHeight = 1080
+        // Capture at the display's native pixel resolution. The bridge layer
+        // (RDPxRDPListener.c → rdpmac_listener_push_frame) tiles the frame
+        // into 64×64 chunks driven by the dirty rects we pass through, so
+        // PDU pressure scales with changed area rather than total pixels —
+        // full-Retina (2560×1440 / 4K / 5K) is fine.
+        let captureWidth = targetDisplay.width
+        let captureHeight = targetDisplay.height
 
         let config = SCStreamConfiguration()
         config.width = captureWidth

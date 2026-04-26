@@ -17,6 +17,7 @@
 #include "RDPxRDPListener.h"
 
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -101,6 +102,11 @@ struct rdpmac_client {
     pthread_t               thread;
     atomic_int              should_stop;
     atomic_int              up_and_running;
+    // Set to 1 by the up_and_running handler; cleared when the client has
+    // received its first full-screen repaint. While set, push_frame ignores
+    // ScreenCaptureKit's (possibly partial) dirty rects and pushes every
+    // tile so the placeholder/blue first frame is overwritten promptly.
+    atomic_int              needs_full_repaint;
 
     // Per-client send lock. OpenSSL's SSL_write is NOT thread-safe on a
     // single SSL_CTX/SSL pair: if two threads call SSL_write concurrently,
@@ -159,7 +165,7 @@ write_minimal_xrdp_ini(const rdpmac_listener_config* cfg, char* out_path, size_t
     fprintf(f,
         "[globals]\n"
         "bitmap_cache=true\n"
-        "bitmap_compression=false\n"
+        "bitmap_compression=true\n"
         "port=%u\n"
         "crypt_level=low\n"
         "security_layer=negotiate\n"
@@ -419,8 +425,80 @@ rdpmac_listener_client_count(rdpmac_listener* l)
 }
 
 // ----------------------------------------------------------------------------
-// Frame delivery (Phase 2 — full-frame fallback; RemoteFX comes in Phase 3).
+// Frame delivery — tiled libxrdp_send_bitmap.
+//
+// Why tiled: a single libxrdp_send_bitmap for a full Retina frame produces
+// ~1 PDU per output row (slow-path TS_UPDATE_BITMAP, ≤16KB each). At 2560-wide
+// that's ~1440 PDUs per frame, which mstsc rejects. By slicing into 64×64
+// tiles, each tile fits in a single PDU. We then drive the tile selection
+// from the dirty rects ScreenCaptureKit already gives us — only changed
+// tiles get sent each frame, so the steady-state PDU rate is small.
 // ----------------------------------------------------------------------------
+
+#define TILE_SIZE              64
+// Per-frame tile cap. Sized to cover a full 4K (3840x2160 = 60x34 = 2040
+// tiles) repaint in a single frame, so window moves and large redraws don't
+// take multiple frames to settle. mstsc empirically handles ~12K PDUs/s in
+// burst (400 tiles × 30 FPS); we sustain the same average rate when idle
+// because dirty rects there are small.
+#define MAX_TILES_PER_FRAME    2400
+// Largest source we'll accept. With 64-px tiles this caps the dedup bitmap
+// at (5120/64) * (3072/64) bits = 80 * 48 = 3840 bits = 480 bytes on stack.
+#define MAX_TILE_GRID_W        80
+#define MAX_TILE_GRID_H        48
+
+// Sum of bytes still queued in the trans's pending-output linked list.
+// Each item is a stream that couldn't be sent immediately (kernel TCP send
+// buffer was full). If this grows large the network or client is behind,
+// and continuing to push frames just adds latency.
+static size_t
+trans_pending_bytes(const struct trans* t)
+{
+    if (t == NULL) return 0;
+    size_t total = 0;
+    const struct stream* s = t->wait_s;
+    while (s != NULL) {
+        total += (size_t)(s->end - s->data);
+        s = s->next;
+    }
+    return total;
+}
+
+// Backpressure threshold: if a client has more than this many bytes pending
+// in its trans output queue, skip sending more this frame. Sized so the
+// queue can hold ~1 frame's worth of dirty area at native res before we
+// start dropping, but never more than that — otherwise mstsc starts
+// rendering with multi-second lag.
+#define BACKPRESSURE_BYTES (4 * 1024 * 1024)  // 4 MB
+
+// Send one BGRX32 tile via the slow-path bitmap update. Caller MUST hold
+// the client's send_mu. Repacks `stride`-aligned source rows into a tightly
+// packed `tw*4` scratch buffer because libxrdp_send_bitmap assumes width*Bpp.
+static int
+send_tile(struct xrdp_session* session,
+          const uint8_t* data, uint32_t stride,
+          int frame_w, int frame_h,
+          int tx, int ty)
+{
+    int tw = (tx + TILE_SIZE > frame_w) ? (frame_w - tx) : TILE_SIZE;
+    int th = (ty + TILE_SIZE > frame_h) ? (frame_h - ty) : TILE_SIZE;
+    if (tw <= 0 || th <= 0) {
+        return 0;
+    }
+
+    // Stack scratch (16KB max — well within thread stack limits).
+    uint8_t scratch[TILE_SIZE * TILE_SIZE * 4];
+    for (int row = 0; row < th; row++) {
+        memcpy(scratch + (size_t)row * tw * 4,
+               data + ((size_t)ty + row) * stride + (size_t)tx * 4,
+               (size_t)tw * 4);
+    }
+
+    return libxrdp_send_bitmap(session,
+                               tw, th, 32,
+                               (char*)scratch,
+                               tx, ty, tw, th);
+}
 
 void
 rdpmac_listener_push_frame(rdpmac_listener* l,
@@ -431,49 +509,181 @@ rdpmac_listener_push_frame(rdpmac_listener* l,
     if (l == NULL || data == NULL || width == 0 || height == 0) {
         return;
     }
-    (void)stride;  // libxrdp_send_bitmap assumes width*4 stride; we pass the
-                   // raw buffer and trust the upstream capture path to feed
-                   // tightly-packed BGRX. If stride != width*4 a future
-                   // implementation will need to repack here.
 
-    static int frame_count = 0;
-    static int active_frames = 0;
-    int active_clients = 0;
-    // Throttle to ~5 FPS — even at this rate mstsc gets ~250 PDUs/sec for a
-    // 1280x720 source, which is heavy but sustainable. Phase 8 will replace
-    // this raw-bitmap path with RemoteFX where mstsc accepts.
+    // Fixed 30 FPS cadence (33 ms minimum interval). The MAX_TILES_PER_FRAME
+    // cap below protects mstsc from burst overload on huge repaints — we'd
+    // rather drop tiles than slow the frame rate, since stale tiles get
+    // picked up by the rotating keep-alive band within ~250 ms anyway.
     static double last_push = 0.0;
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     double now = (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
-    if (now - last_push < 0.2) {
+    if (now - last_push < 0.033) {
         return;
     }
     last_push = now;
 
+    // Build a deduplicated tile bitmap. Each bit represents one TILE_SIZE×
+    // TILE_SIZE tile in the frame. `numRects == 0` means full-frame redraw
+    // (e.g. first frame after up_and_running, or no SCKit dirty rects).
+    int tiles_w = ((int)width  + TILE_SIZE - 1) / TILE_SIZE;
+    int tiles_h = ((int)height + TILE_SIZE - 1) / TILE_SIZE;
+    if (tiles_w > MAX_TILE_GRID_W) tiles_w = MAX_TILE_GRID_W;
+    if (tiles_h > MAX_TILE_GRID_H) tiles_h = MAX_TILE_GRID_H;
+    int total_tiles = tiles_w * tiles_h;
+
+    static const int BMP_BYTES = (MAX_TILE_GRID_W * MAX_TILE_GRID_H + 7) / 8;
+    uint8_t dirty_bmp[BMP_BYTES];
+    memset(dirty_bmp, 0, sizeof(dirty_bmp));
+
+    int dirty_tiles = 0;
+
+    // Periodic keep-alive: every ~2 seconds, mark a strip of tiles dirty
+    // so areas the OS copy-blitted (and ScreenCaptureKit therefore didn't
+    // report as dirty — e.g. the spot a window was just dragged from) get
+    // a fresh repaint. We rotate through the screen in horizontal bands so
+    // we cover everything within ~2-3 seconds without ever bursting more
+    // than `band_height_in_tiles` tiles at once.
+    static double last_refresh_pass = 0.0;
+    static int    refresh_band_y    = 0;  // tile-row to refresh next
+    bool force_band = false;
+    if (now - last_refresh_pass > 0.250) {
+        last_refresh_pass = now;
+        force_band = true;
+    }
+
+    if (numRects == 0 || rects == NULL) {
+        // Whole frame.
+        memset(dirty_bmp, 0xFF, sizeof(dirty_bmp));
+        dirty_tiles = total_tiles;
+    } else {
+        for (uint32_t r = 0; r < numRects; r++) {
+            int x0 = rects[r].left   / TILE_SIZE;
+            int y0 = rects[r].top    / TILE_SIZE;
+            int x1 = (rects[r].right  + TILE_SIZE - 1) / TILE_SIZE;
+            int y1 = (rects[r].bottom + TILE_SIZE - 1) / TILE_SIZE;
+            if (x0 < 0) x0 = 0;
+            if (y0 < 0) y0 = 0;
+            if (x1 > tiles_w) x1 = tiles_w;
+            if (y1 > tiles_h) y1 = tiles_h;
+            for (int ty = y0; ty < y1; ty++) {
+                for (int tx = x0; tx < x1; tx++) {
+                    int idx = ty * tiles_w + tx;
+                    int byte = idx >> 3;
+                    int mask = 1 << (idx & 7);
+                    if (!(dirty_bmp[byte] & mask)) {
+                        dirty_bmp[byte] |= (uint8_t)mask;
+                        dirty_tiles++;
+                    }
+                }
+            }
+        }
+    }
+
+    // Add the keep-alive band on top of any dirty rects from this frame.
+    if (force_band) {
+        if (refresh_band_y >= tiles_h) refresh_band_y = 0;
+        for (int tx = 0; tx < tiles_w; tx++) {
+            int idx = refresh_band_y * tiles_w + tx;
+            int byte = idx >> 3;
+            int mask = 1 << (idx & 7);
+            if (!(dirty_bmp[byte] & mask)) {
+                dirty_bmp[byte] |= (uint8_t)mask;
+                dirty_tiles++;
+            }
+        }
+        refresh_band_y++;
+    }
+
+    if (dirty_tiles == 0) {
+        return;
+    }
+    if (dirty_tiles > MAX_TILES_PER_FRAME) {
+        dirty_tiles = MAX_TILES_PER_FRAME;
+    }
+
+    static int frame_count = 0;
+    static int active_frames = 0;
+    int active_clients = 0;
+
     pthread_mutex_lock(&l->clients_mu);
     for (rdpmac_client* c = l->clients; c != NULL; c = c->next) {
-        if (!atomic_load(&c->up_and_running)) {
-            continue;
-        }
-        if (c->session == NULL) {
+        if (!atomic_load(&c->up_and_running) || c->session == NULL) {
             continue;
         }
         active_clients++;
 
-        // Serialize against the client thread's own SSL_write to avoid
-        // OpenSSL state corruption (see send_mu doc on the struct).
+        // Per-client view of dirty tiles. Starts as a copy of the frame's
+        // dedup bitmap. If this client just transitioned to up_and_running,
+        // override with all-ones so we overwrite the placeholder/blue
+        // initial frame promptly even when SCKit reports few dirty rects.
+        uint8_t client_bmp[BMP_BYTES];
+        int client_dirty = dirty_tiles;
+        bool full_repaint = atomic_exchange(&c->needs_full_repaint, 0);
+        if (full_repaint) {
+            memset(client_bmp, 0xFF, sizeof(client_bmp));
+            client_dirty = total_tiles;
+        } else {
+            memcpy(client_bmp, dirty_bmp, sizeof(client_bmp));
+        }
+
+        // Backpressure: if the client's trans output queue is already
+        // backed up, skip this frame entirely UNLESS we owe a full repaint
+        // (in which case we wait for the queue to drain on a future call,
+        // but keep the flag set). Without the override, a heavily-loaded
+        // queue would persist the placeholder.
+        size_t pending = trans_pending_bytes(c->trans);
+        if (pending > BACKPRESSURE_BYTES) {
+            if (full_repaint) {
+                // Re-arm so a later, drained frame still does the repaint.
+                atomic_store(&c->needs_full_repaint, 1);
+            }
+            if ((frame_count % 30) == 0) {
+                rdpmac_log("[xRDP] push_frame: skip — pending=%zu MB\n",
+                           pending / (1024 * 1024));
+            }
+            continue;
+        }
+
         pthread_mutex_lock(&c->send_mu);
-        // Send the bitmap. libxrdp_send_bitmap internally tiles and compresses
-        // for sizes that don't fit in a single update PDU.
-        int rv = libxrdp_send_bitmap(c->session,
-                                     (int)width, (int)height, 32,
-                                     (char*)data,
-                                     0, 0, (int)width, (int)height);
+        int sent = 0;
+        int fail = 0;
+        bool dropped = false;
+        // Inside the send loop, recheck backpressure every 32 tiles so a
+        // huge dirty set can't push the queue beyond the threshold either.
+        for (int idx = 0; idx < tiles_w * tiles_h && sent < client_dirty; idx++) {
+            if (!(client_bmp[idx >> 3] & (1 << (idx & 7)))) {
+                continue;
+            }
+            if ((sent & 31) == 0 && trans_pending_bytes(c->trans) > BACKPRESSURE_BYTES) {
+                dropped = true;
+                break;
+            }
+            int tx = (idx % tiles_w) * TILE_SIZE;
+            int ty = (idx / tiles_w) * TILE_SIZE;
+            int rv = send_tile(c->session, data, stride,
+                               (int)width, (int)height, tx, ty);
+            if (rv != 0) {
+                fail++;
+            }
+            sent++;
+        }
         pthread_mutex_unlock(&c->send_mu);
-        if (active_frames < 3 || (active_frames % 30) == 0 || rv != 0) {
-            rdpmac_log("[xRDP] push_frame[total=%d, active=%d]: rv=%d (%ux%u)\n",
-                       frame_count, active_frames, rv, width, height);
+
+        // If the full repaint got cut short by backpressure, re-arm it for
+        // the next frame so it eventually completes.
+        if (full_repaint && dropped) {
+            atomic_store(&c->needs_full_repaint, 1);
+        }
+
+        if (active_frames < 3 || (active_frames % 30) == 0 || fail > 0 ||
+            full_repaint) {
+            rdpmac_log("[xRDP] push_frame[total=%d, active=%d]: tiles_sent=%d "
+                       "fails=%d full_repaint=%d (%ux%u, dirty=%d/%d, "
+                       "pending=%zuKB)\n",
+                       frame_count, active_frames, sent, fail,
+                       (int)full_repaint, width, height,
+                       client_dirty, total_tiles, pending / 1024);
         }
     }
     if (active_clients > 0) {
@@ -551,6 +761,7 @@ on_new_connection_callback(struct trans* self, struct trans* new_self)
     client->session  = NULL;
     atomic_init(&client->should_stop, 0);
     atomic_init(&client->up_and_running, 0);
+    atomic_init(&client->needs_full_repaint, 0);
     {
         // Recursive mutex: the client thread enters trans_check_wait_objs while
         // holding send_mu; libxrdp may invoke our session callback (e.g. on
@@ -900,6 +1111,7 @@ client_xrdp_callback(intptr_t id, int msg,
                            ci->jpeg_codec_id, ci->h264_codec_id,
                            ci->use_bulk_comp);
                 atomic_store(&client->up_and_running, 1);
+                atomic_store(&client->needs_full_repaint, 1);
                 pthread_mutex_lock(&client->send_mu);
                 int prv = libxrdp_send_pointer_system(client->session, 0);
 
