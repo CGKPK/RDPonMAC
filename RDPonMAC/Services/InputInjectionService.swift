@@ -9,6 +9,10 @@ final class InputInjectionService {
     private var lastMousePosition = CGPoint.zero
     private var displayBounds: CGRect = .zero
     private var scaleFactor: CGFloat = 1.0
+    // RDP-side capture resolution. Mouse events from the client are in this
+    // coordinate space; we scale to displayBounds.size before injecting.
+    private var remoteWidth: CGFloat = 1920
+    private var remoteHeight: CGFloat = 1080
 
     // IOKit HID connection for login screen input
     private var hidConnection: io_connect_t = 0
@@ -60,9 +64,12 @@ final class InputInjectionService {
                        &event, UInt32(kNXEventDataVersion), 0, 0)
     }
 
-    func configure(displayBounds: CGRect, scaleFactor: CGFloat) {
+    func configure(displayBounds: CGRect, scaleFactor: CGFloat,
+                   remoteWidth: CGFloat = 1920, remoteHeight: CGFloat = 1080) {
         self.displayBounds = displayBounds
         self.scaleFactor = scaleFactor
+        self.remoteWidth = remoteWidth
+        self.remoteHeight = remoteHeight
     }
 
     // MARK: - Keyboard Events
@@ -107,8 +114,15 @@ final class InputInjectionService {
     // MARK: - Mouse Events
 
     func handleMouse(flags: UInt16, x: UInt16, y: UInt16) {
-        let screenX = displayBounds.origin.x + CGFloat(x)
-        let screenY = displayBounds.origin.y + CGFloat(y)
+        // Map (x, y) from the RDP capture coordinate space (remoteWidth x
+        // remoteHeight, e.g. 1920x1080) into the macOS display coordinate
+        // space (displayBounds.size, typically 1280x720 logical on Retina).
+        // Without this scaling, clicks land in the wrong spot whenever the
+        // capture resolution differs from the display resolution.
+        let scaleX = (remoteWidth  > 0) ? displayBounds.size.width  / remoteWidth  : 1.0
+        let scaleY = (remoteHeight > 0) ? displayBounds.size.height / remoteHeight : 1.0
+        let screenX = displayBounds.origin.x + CGFloat(x) * scaleX
+        let screenY = displayBounds.origin.y + CGFloat(y) * scaleY
         let point = CGPoint(x: screenX, y: screenY)
         let useCGEvent = PermissionService.checkAccessibility()
         let useHID = !useCGEvent && hidAvailable

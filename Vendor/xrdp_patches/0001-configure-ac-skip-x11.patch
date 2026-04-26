@@ -1,0 +1,49 @@
+diff --git a/configure.ac b/configure.ac
+index aa104cc..b9f172b 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -523,21 +523,23 @@ fi
+ 
+ AC_PATH_XTRA
+ if test "x$no_x" == "xyes"; then
+-  AC_MSG_ERROR([please install libx11-dev or libX11-devel])
+-fi
++  AC_MSG_NOTICE([X11 disabled — skipping Xfixes/Xrandr checks (macOS spike)])
++else
++  save_CFLAGS="$CFLAGS"
++  CFLAGS="$CFLAGS $X_CFLAGS"
+ 
+-save_CFLAGS="$CFLAGS"
+-CFLAGS="$CFLAGS $X_CFLAGS"
++  # checking for Xfixes
++  AC_CHECK_HEADER([X11/extensions/Xfixes.h], [],
++    [AC_MSG_ERROR([please install libxfixes-dev or libXfixes-devel])],
++    [#include <X11/Xlib.h>])
+ 
+-# checking for Xfixes
+-AC_CHECK_HEADER([X11/extensions/Xfixes.h], [],
+-  [AC_MSG_ERROR([please install libxfixes-dev or libXfixes-devel])],
+-  [#include <X11/Xlib.h>])
++  # checking for Xrandr
++  AC_CHECK_HEADER([X11/extensions/Xrandr.h], [],
++    [AC_MSG_ERROR([please install libxrandr-dev or libXrandr-devel])],
++    [#include <X11/Xlib.h>])
+ 
+-# checking for Xrandr
+-AC_CHECK_HEADER([X11/extensions/Xrandr.h], [],
+-  [AC_MSG_ERROR([please install libxrandr-dev or libXrandr-devel])],
+-  [#include <X11/Xlib.h>])
++  CFLAGS="$save_CFLAGS"
++fi
+ 
+ if test "x$enable_utmp" = "xyes"
+ then
+@@ -548,8 +550,6 @@ then
+     AXRDP_CHECK_UTMPX_MEMBER_EXISTS([ut_exit], [HAVE_UTMPX_UT_EXIT])
+ fi
+ 
+-CFLAGS="$save_CFLAGS"
+-
+ # perform unit tests if libcheck and libmocka found
+ perform_unit_tests=yes; # Assume packages will be found
+ if test "x$ensure_tests_deps" == "xyes"; then

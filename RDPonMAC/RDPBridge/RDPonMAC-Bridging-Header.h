@@ -1,7 +1,8 @@
 // RDPonMAC-Bridging-Header.h
 // This header exposes ONLY our C bridge API to Swift.
-// FreeRDP types are hidden behind opaque pointers to avoid
-// namespace collisions (WinPR GUID vs Foundation UUID).
+// The implementation now sits on top of xRDP's libxrdp instead of FreeRDP's
+// shadow server, so the FreeRDP-specific opaque handles (surface, settings)
+// have been removed. The remaining handles are bridge-owned types.
 
 #ifndef RDPonMAC_Bridging_Header_h
 #define RDPonMAC_Bridging_Header_h
@@ -14,11 +15,12 @@ extern "C" {
 #endif
 
 // ============================================================
-// Opaque pointer types (hide FreeRDP internals from Swift)
+// Opaque pointer types
 // ============================================================
+#ifndef RDPServerHandle_DEFINED
+#define RDPServerHandle_DEFINED
 typedef void* RDPServerHandle;
-typedef void* RDPSurfaceHandle;
-typedef void* RDPSettingsHandle;
+#endif
 typedef void* RDPClipboardHandle;
 typedef void* RDPAudioHandle;
 

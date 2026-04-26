@@ -30,6 +30,7 @@
 		AA000015 /* RDPInputBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000015; };
 		AA000016 /* RDPClipboardBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000016; };
 		AA000017 /* RDPAudioBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000017; };
+		AA000040 /* RDPxRDPListener.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000040; };
 		AA000020 /* ScreenCaptureKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000020; };
 		AA000021 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000021; };
 		AA000022 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000022; };
@@ -70,6 +71,9 @@
 		AB00001B /* RDPInputBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPInputBridge.h; sourceTree = "<group>"; };
 		AB00001C /* RDPClipboardBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPClipboardBridge.h; sourceTree = "<group>"; };
 		AB00001D /* RDPAudioBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPAudioBridge.h; sourceTree = "<group>"; };
+		AB000040 /* RDPxRDPListener.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPxRDPListener.c; sourceTree = "<group>"; };
+		AB000041 /* RDPxRDPListener.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPxRDPListener.h; sourceTree = "<group>"; };
+		AB000042 /* RDPServerInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPServerInternal.h; sourceTree = "<group>"; };
 		AB00001E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AB00001F /* RDPonMAC.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RDPonMAC.entitlements; sourceTree = "<group>"; };
 		AB000020 /* ScreenCaptureKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenCaptureKit.framework; path = System/Library/Frameworks/ScreenCaptureKit.framework; sourceTree = SDKROOT; };
@@ -185,6 +189,9 @@
 				AB000016 /* RDPClipboardBridge.c */,
 				AB00001D /* RDPAudioBridge.h */,
 				AB000017 /* RDPAudioBridge.c */,
+				AB000041 /* RDPxRDPListener.h */,
+				AB000040 /* RDPxRDPListener.c */,
+				AB000042 /* RDPServerInternal.h */,
 			);
 			path = RDPBridge;
 			sourceTree = "<group>";
@@ -219,6 +226,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = AF000003 /* Build configuration list for PBXNativeTarget "RDPonMAC" */;
 			buildPhases = (
+				AE000050 /* ShellScript: build libxrdp */,
 				AE000002 /* Sources */,
 				AC000001 /* Frameworks */,
 			);
@@ -259,6 +267,28 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		AE000050 /* ShellScript: build libxrdp */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 0;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Vendor/xrdp/configure.ac",
+			);
+			name = "ShellScript: build libxrdp";
+			outputPaths = (
+				"$(SRCROOT)/Vendor/xrdp/build/lib/libxrdp.a",
+				"$(SRCROOT)/Vendor/xrdp/build/lib/libcommon.a",
+				"$(SRCROOT)/Vendor/xrdp/build/lib/librfxencode.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"$SRCROOT/Scripts/build_libxrdp.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		AE000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -287,6 +317,7 @@
 				AA000015 /* RDPInputBridge.c in Sources */,
 				AA000016 /* RDPClipboardBridge.c in Sources */,
 				AA000017 /* RDPAudioBridge.c in Sources */,
+				AA000040 /* RDPxRDPListener.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -363,8 +394,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
-					/opt/homebrew/include/freerdp3,
-					/opt/homebrew/include/winpr3,
+					"$(SRCROOT)/Vendor/xrdp/build/include",
+					"/opt/homebrew/opt/openssl@3/include",
 					/opt/homebrew/include,
 				);
 				INFOPLIST_FILE = RDPonMAC/App/Info.plist;
@@ -373,14 +404,15 @@
 					"@executable_path/../Frameworks",
 					/opt/homebrew/lib,
 				);
-				LIBRARY_SEARCH_PATHS = /opt/homebrew/lib;
+				LIBRARY_SEARCH_PATHS = (
+					"/opt/homebrew/opt/openssl@3/lib",
+					/opt/homebrew/lib,
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
-					"-lfreerdp3",
-					"-lfreerdp-server3",
-					"-lfreerdp-shadow3",
-					"-lwinpr3",
-					"-lwinpr-tools3",
+					"$(SRCROOT)/Vendor/xrdp/build/lib/libxrdp.a",
+					"$(SRCROOT)/Vendor/xrdp/build/lib/libcommon.a",
+					"$(SRCROOT)/Vendor/xrdp/build/lib/librfxencode.a",
 					"-lssl",
 					"-lcrypto",
 					"-lpam",
@@ -403,8 +435,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
-					/opt/homebrew/include/freerdp3,
-					/opt/homebrew/include/winpr3,
+					"$(SRCROOT)/Vendor/xrdp/build/include",
+					"/opt/homebrew/opt/openssl@3/include",
 					/opt/homebrew/include,
 				);
 				INFOPLIST_FILE = RDPonMAC/App/Info.plist;
@@ -413,14 +445,15 @@
 					"@executable_path/../Frameworks",
 					/opt/homebrew/lib,
 				);
-				LIBRARY_SEARCH_PATHS = /opt/homebrew/lib;
+				LIBRARY_SEARCH_PATHS = (
+					"/opt/homebrew/opt/openssl@3/lib",
+					/opt/homebrew/lib,
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
-					"-lfreerdp3",
-					"-lfreerdp-server3",
-					"-lfreerdp-shadow3",
-					"-lwinpr3",
-					"-lwinpr-tools3",
+					"$(SRCROOT)/Vendor/xrdp/build/lib/libxrdp.a",
+					"$(SRCROOT)/Vendor/xrdp/build/lib/libcommon.a",
+					"$(SRCROOT)/Vendor/xrdp/build/lib/librfxencode.a",
 					"-lssl",
 					"-lcrypto",
 					"-lpam",

@@ -125,11 +125,9 @@ final class RDPServerManager: ObservableObject {
         // Initialize surface with a blue placeholder frame so clients can connect
         // even before screen capture starts
         if let server = self.server {
-            // Use logical resolution (not Retina) to match ScreenCaptureKit output
-            let mainDisplay = CGMainDisplayID()
-            let scaleFactor = NSScreen.main?.backingScaleFactor ?? 2.0
-            let pw = UInt32(CGFloat(CGDisplayPixelsWide(mainDisplay)) / scaleFactor)
-            let ph = UInt32(CGFloat(CGDisplayPixelsHigh(mainDisplay)) / scaleFactor)
+            // Match the capture resolution we configure in ScreenCaptureService.
+            let pw: UInt32 = 1920
+            let ph: UInt32 = 1080
             let pstride = pw * 4
             var blueFrame = [UInt8](repeating: 0, count: Int(ph * pstride))
             // Fill with dark blue (BGRX format)

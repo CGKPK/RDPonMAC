@@ -46,11 +46,16 @@ final class ScreenCaptureService: NSObject {
             targetDisplay = mainDisplay
         }
 
-        // Configure stream — use logical resolution (not Retina physical pixels)
-        // This reduces data by 4x on Retina displays (e.g., 1280x720 instead of 2560x1440)
-        let scaleFactor = NSScreen.main?.backingScaleFactor ?? 2.0
-        let captureWidth = Int(CGFloat(targetDisplay.width) / scaleFactor)
-        let captureHeight = Int(CGFloat(targetDisplay.height) / scaleFactor)
+        // Capture at 1920×1080 — readable on a hi-DPI client window without
+        // blowing through mstsc's slow-path bitmap-update budget. Each row
+        // becomes a ~16KB PDU, so 1080 rows × 5 FPS = ~5400 PDUs/s, which
+        // mstsc still handles. Native Retina 2560×1440 (~1440 rows) caused
+        // a guaranteed disconnect; logical 1280×720 worked but rendered too
+        // small to read text. Phase 8 (RemoteFX) lifts this restriction.
+        // ScreenCaptureKit downscales the display content to the requested
+        // size, preserving aspect by default.
+        let captureWidth = 1920
+        let captureHeight = 1080
 
         let config = SCStreamConfiguration()
         config.width = captureWidth

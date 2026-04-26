@@ -1,0 +1,31 @@
+# Xcode build outputs
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+xcshareddata/
+*.xcworkspace/xcuserdata
+.swiftpm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Vendored upstream sources — auto-cloned by Scripts/build_libxrdp.sh.
+# We keep our patches under Vendor/xrdp_patches/ but don't commit the
+# upstream xrdp tree itself.
+Vendor/xrdp/
+
+# Build script outputs (generated)
+/tmp/xrdp-*.log
+/tmp/rdponmac.log
+/tmp/rdponmac_nego.log
+/tmp/rdp_capture.log
+/tmp/rdp_proxy.log
+/tmp/rdp_stderr.log
+
+# Local app data (cert files, ini, log)
+*.crt
+*.key
+*.pem
