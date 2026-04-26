@@ -1,0 +1,461 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA000001 /* RDPonMACApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000001; };
+		AA000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000002; };
+		AA000003 /* MainSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000003; };
+		AA000004 /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000004; };
+		AA000005 /* PermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000005; };
+		AA000006 /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000006; };
+		AA000007 /* MonitorLayoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000007; };
+		AA000008 /* ServerConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000008; };
+		AA000009 /* ConnectionInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000009; };
+		AA00000A /* MonitorInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB00000A; };
+		AA00000B /* RDPServerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB00000B; };
+		AA00000C /* ScreenCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB00000C; };
+		AA00000D /* InputInjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB00000D; };
+		AA00000E /* ClipboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB00000E; };
+		AA00000F /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB00000F; };
+		AA000010 /* MonitorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010; };
+		AA000011 /* CertificateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011; };
+		AA000012 /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012; };
+		AA000013 /* RDPSubsystem.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000013; };
+		AA000014 /* RDPServerBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000014; };
+		AA000015 /* RDPInputBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000015; };
+		AA000016 /* RDPClipboardBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000016; };
+		AA000017 /* RDPAudioBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000017; };
+		AA000020 /* ScreenCaptureKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000020; };
+		AA000021 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000021; };
+		AA000022 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000022; };
+		AA000023 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000023; };
+		AA000024 /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000024; };
+		AA000025 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000025; };
+		AA000026 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000026; };
+		AA000027 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB000027; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AB000001 /* RDPonMACApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPonMACApp.swift; sourceTree = "<group>"; };
+		AB000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		AB000003 /* MainSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainSettingsView.swift; sourceTree = "<group>"; };
+		AB000004 /* StatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarView.swift; sourceTree = "<group>"; };
+		AB000005 /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
+		AB000006 /* SecuritySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettingsView.swift; sourceTree = "<group>"; };
+		AB000007 /* MonitorLayoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorLayoutView.swift; sourceTree = "<group>"; };
+		AB000008 /* ServerConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfiguration.swift; sourceTree = "<group>"; };
+		AB000009 /* ConnectionInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionInfo.swift; sourceTree = "<group>"; };
+		AB00000A /* MonitorInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorInfo.swift; sourceTree = "<group>"; };
+		AB00000B /* RDPServerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDPServerManager.swift; sourceTree = "<group>"; };
+		AB00000C /* ScreenCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCaptureService.swift; sourceTree = "<group>"; };
+		AB00000D /* InputInjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputInjectionService.swift; sourceTree = "<group>"; };
+		AB00000E /* ClipboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardService.swift; sourceTree = "<group>"; };
+		AB00000F /* AudioCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureService.swift; sourceTree = "<group>"; };
+		AB000010 /* MonitorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorService.swift; sourceTree = "<group>"; };
+		AB000011 /* CertificateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateService.swift; sourceTree = "<group>"; };
+		AB000012 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		AB000013 /* RDPSubsystem.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPSubsystem.c; sourceTree = "<group>"; };
+		AB000014 /* RDPServerBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPServerBridge.c; sourceTree = "<group>"; };
+		AB000015 /* RDPInputBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPInputBridge.c; sourceTree = "<group>"; };
+		AB000016 /* RDPClipboardBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPClipboardBridge.c; sourceTree = "<group>"; };
+		AB000017 /* RDPAudioBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPAudioBridge.c; sourceTree = "<group>"; };
+		AB000018 /* RDPonMAC-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RDPonMAC-Bridging-Header.h"; sourceTree = "<group>"; };
+		AB000019 /* RDPSubsystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPSubsystem.h; sourceTree = "<group>"; };
+		AB00001A /* RDPServerBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPServerBridge.h; sourceTree = "<group>"; };
+		AB00001B /* RDPInputBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPInputBridge.h; sourceTree = "<group>"; };
+		AB00001C /* RDPClipboardBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPClipboardBridge.h; sourceTree = "<group>"; };
+		AB00001D /* RDPAudioBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDPAudioBridge.h; sourceTree = "<group>"; };
+		AB00001E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AB00001F /* RDPonMAC.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RDPonMAC.entitlements; sourceTree = "<group>"; };
+		AB000020 /* ScreenCaptureKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScreenCaptureKit.framework; path = System/Library/Frameworks/ScreenCaptureKit.framework; sourceTree = SDKROOT; };
+		AB000021 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		AB000022 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		AB000023 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		AB000024 /* IOSurface.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOSurface.framework; path = System/Library/Frameworks/IOSurface.framework; sourceTree = SDKROOT; };
+		AB000025 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
+		AB000026 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		AB000027 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		AB000030 /* RDPonMAC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RDPonMAC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AC000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000020 /* ScreenCaptureKit.framework in Frameworks */,
+				AA000021 /* CoreGraphics.framework in Frameworks */,
+				AA000022 /* CoreAudio.framework in Frameworks */,
+				AA000023 /* AudioToolbox.framework in Frameworks */,
+				AA000024 /* IOSurface.framework in Frameworks */,
+				AA000025 /* CoreVideo.framework in Frameworks */,
+				AA000026 /* AppKit.framework in Frameworks */,
+				AA000027 /* Security.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AD000001 /* Root */ = {
+			isa = PBXGroup;
+			children = (
+				AD000002 /* RDPonMAC */,
+				AD000009 /* Frameworks */,
+				AD00000A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AD000002 /* RDPonMAC */ = {
+			isa = PBXGroup;
+			children = (
+				AD000003 /* App */,
+				AD000004 /* Views */,
+				AD000005 /* Models */,
+				AD000006 /* Services */,
+				AD000007 /* RDPBridge */,
+				AB00001F /* RDPonMAC.entitlements */,
+			);
+			path = RDPonMAC;
+			sourceTree = "<group>";
+		};
+		AD000003 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				AB000001 /* RDPonMACApp.swift */,
+				AB000002 /* AppDelegate.swift */,
+				AB00001E /* Info.plist */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		AD000004 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AB000003 /* MainSettingsView.swift */,
+				AB000004 /* StatusBarView.swift */,
+				AB000005 /* PermissionsView.swift */,
+				AB000006 /* SecuritySettingsView.swift */,
+				AB000007 /* MonitorLayoutView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		AD000005 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AB000008 /* ServerConfiguration.swift */,
+				AB000009 /* ConnectionInfo.swift */,
+				AB00000A /* MonitorInfo.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AD000006 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				AB00000B /* RDPServerManager.swift */,
+				AB00000C /* ScreenCaptureService.swift */,
+				AB00000D /* InputInjectionService.swift */,
+				AB00000E /* ClipboardService.swift */,
+				AB00000F /* AudioCaptureService.swift */,
+				AB000010 /* MonitorService.swift */,
+				AB000011 /* CertificateService.swift */,
+				AB000012 /* PermissionService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		AD000007 /* RDPBridge */ = {
+			isa = PBXGroup;
+			children = (
+				AB000018 /* RDPonMAC-Bridging-Header.h */,
+				AB000019 /* RDPSubsystem.h */,
+				AB000013 /* RDPSubsystem.c */,
+				AB00001A /* RDPServerBridge.h */,
+				AB000014 /* RDPServerBridge.c */,
+				AB00001B /* RDPInputBridge.h */,
+				AB000015 /* RDPInputBridge.c */,
+				AB00001C /* RDPClipboardBridge.h */,
+				AB000016 /* RDPClipboardBridge.c */,
+				AB00001D /* RDPAudioBridge.h */,
+				AB000017 /* RDPAudioBridge.c */,
+			);
+			path = RDPBridge;
+			sourceTree = "<group>";
+		};
+		AD000009 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				AB000020 /* ScreenCaptureKit.framework */,
+				AB000021 /* CoreGraphics.framework */,
+				AB000022 /* CoreAudio.framework */,
+				AB000023 /* AudioToolbox.framework */,
+				AB000024 /* IOSurface.framework */,
+				AB000025 /* CoreVideo.framework */,
+				AB000026 /* AppKit.framework */,
+				AB000027 /* Security.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		AD00000A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AB000030 /* RDPonMAC.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AE000001 /* RDPonMAC */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF000003 /* Build configuration list for PBXNativeTarget "RDPonMAC" */;
+			buildPhases = (
+				AE000002 /* Sources */,
+				AC000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RDPonMAC;
+			productName = RDPonMAC;
+			productReference = AB000030 /* RDPonMAC.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AE000010 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = AF000001 /* Build configuration list for PBXProject "RDPonMAC" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AD000001 /* Root */;
+			productRefGroup = AD00000A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AE000001 /* RDPonMAC */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AE000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000001 /* RDPonMACApp.swift in Sources */,
+				AA000002 /* AppDelegate.swift in Sources */,
+				AA000003 /* MainSettingsView.swift in Sources */,
+				AA000004 /* StatusBarView.swift in Sources */,
+				AA000005 /* PermissionsView.swift in Sources */,
+				AA000006 /* SecuritySettingsView.swift in Sources */,
+				AA000007 /* MonitorLayoutView.swift in Sources */,
+				AA000008 /* ServerConfiguration.swift in Sources */,
+				AA000009 /* ConnectionInfo.swift in Sources */,
+				AA00000A /* MonitorInfo.swift in Sources */,
+				AA00000B /* RDPServerManager.swift in Sources */,
+				AA00000C /* ScreenCaptureService.swift in Sources */,
+				AA00000D /* InputInjectionService.swift in Sources */,
+				AA00000E /* ClipboardService.swift in Sources */,
+				AA00000F /* AudioCaptureService.swift in Sources */,
+				AA000010 /* MonitorService.swift in Sources */,
+				AA000011 /* CertificateService.swift in Sources */,
+				AA000012 /* PermissionService.swift in Sources */,
+				AA000013 /* RDPSubsystem.c in Sources */,
+				AA000014 /* RDPServerBridge.c in Sources */,
+				AA000015 /* RDPInputBridge.c in Sources */,
+				AA000016 /* RDPClipboardBridge.c in Sources */,
+				AA000017 /* RDPAudioBridge.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AF000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AF000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		AF000020 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = RDPonMAC/RDPonMAC.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					/opt/homebrew/include/freerdp3,
+					/opt/homebrew/include/winpr3,
+					/opt/homebrew/include,
+				);
+				INFOPLIST_FILE = RDPonMAC/App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					/opt/homebrew/lib,
+				);
+				LIBRARY_SEARCH_PATHS = /opt/homebrew/lib;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-lfreerdp3",
+					"-lfreerdp-server3",
+					"-lfreerdp-shadow3",
+					"-lwinpr3",
+					"-lwinpr-tools3",
+					"-lssl",
+					"-lcrypto",
+					"-lpam",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.rdponmac.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "RDPonMAC/RDPBridge/RDPonMAC-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AF000021 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = RDPonMAC/RDPonMAC.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					/opt/homebrew/include/freerdp3,
+					/opt/homebrew/include/winpr3,
+					/opt/homebrew/include,
+				);
+				INFOPLIST_FILE = RDPonMAC/App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					/opt/homebrew/lib,
+				);
+				LIBRARY_SEARCH_PATHS = /opt/homebrew/lib;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-lfreerdp3",
+					"-lfreerdp-server3",
+					"-lfreerdp-shadow3",
+					"-lwinpr3",
+					"-lwinpr-tools3",
+					"-lssl",
+					"-lcrypto",
+					"-lpam",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.rdponmac.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "RDPonMAC/RDPBridge/RDPonMAC-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AF000001 /* Build configuration list for PBXProject "RDPonMAC" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF000010 /* Debug */,
+				AF000011 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF000003 /* Build configuration list for PBXNativeTarget "RDPonMAC" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF000020 /* Debug */,
+				AF000021 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = AE000010 /* Project object */;
+}
