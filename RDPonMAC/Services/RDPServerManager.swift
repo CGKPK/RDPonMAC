@@ -34,6 +34,8 @@ final class RDPServerManager: ObservableObject {
     private let inputInjection = InputInjectionService()
     private let clipboardService = ClipboardService()
     private let audioCaptureService = AudioCaptureService()
+    private let cursorService = CursorService()
+    private let displayResolutionService = DisplayResolutionService()
     private var config = ServerConfiguration.load()
 
     // Retained reference for C callback context
@@ -188,6 +190,12 @@ final class RDPServerManager: ObservableObject {
             )
         }
 
+        // Start the cursor poller so connected clients see the macOS
+        // cursor shape change (resize cursors near window edges, I-beam
+        // over text fields, hand over links, etc.).
+        cursorService.server = serverPtr
+        cursorService.start()
+
         isRunning = true
         statusMessage = "Running on port \(config.port)"
         lastError = nil
@@ -196,9 +204,14 @@ final class RDPServerManager: ObservableObject {
     func stop() async {
         guard isRunning else { return }
 
+        cursorService.stop()
         await screenCapture.stopCapture()
         clipboardService.stop()
         audioCaptureService.stop()
+        // Put the local display back to whatever resolution the user had
+        // before they started the server. We hold this snapshot inside
+        // DisplayResolutionService.
+        displayResolutionService.restoreOriginal()
 
         await cleanup()
 
@@ -299,6 +312,17 @@ final class RDPServerManager: ObservableObject {
                 }
             }
         }
+
+        g_macSubsystemContext.onClientResolution = { ctx, width, height in
+            guard let ctx = ctx else { return }
+            let manager = Unmanaged<RDPServerManager>.fromOpaque(ctx).takeUnretainedValue()
+            // Hop to the main actor: we touch InputInjectionService and
+            // ScreenCaptureService, both of which are not safe to mutate
+            // from the libxrdp client thread.
+            DispatchQueue.main.async {
+                manager.handleClientResolution(width: width, height: height)
+            }
+        }
     }
 
     private func releaseCallbackBridge() {
@@ -310,9 +334,92 @@ final class RDPServerManager: ObservableObject {
         g_macSubsystemContext.onMouseEvent = nil
         g_macSubsystemContext.onClientConnect = nil
         g_macSubsystemContext.onClientDisconnect = nil
+        g_macSubsystemContext.onClientResolution = nil
 
         callbackBridge?.release()
         callbackBridge = nil
+    }
+
+    // MARK: - Client resolution
+
+    /// Called from the libxrdp client thread (via onClientResolution
+    /// trampolined through DispatchQueue.main) once the client has
+    /// negotiated its desktop size. We:
+    ///   1. Live-reconfigure SCStream so its output buffer matches
+    ///      the client surface — eliminates client-side scrollbars and
+    ///      stops us from wasting bandwidth on tiles that fall outside
+    ///      the client's drawable area.
+    ///   2. Update the input scaling so mouse coords from the client
+    ///      land on the right pixel on the Mac display.
+    /// Re-arms a full repaint flag implicitly: the next frame from the
+    /// reconfigured SCStream comes back at the new size, and push_frame's
+    /// dirty-rect path treats the size change as a full-screen update.
+    private func handleClientResolution(width: UInt32, height: UInt32) {
+        let w = Int(width)
+        let h = Int(height)
+        logToFile("[RDPonMAC] Client negotiated resolution \(w)x\(h) — " +
+                  "switching display mode + reconfiguring capture")
+
+        // Update the most recent client's resolution in the published list
+        // so the GUI can show "1740×1083" next to the connected client.
+        // We only track one row per real connection so updating the last
+        // entry is correct (mstsc's mid-session resize fires this again
+        // through the same client).
+        if let lastIdx = connectedClients.indices.last {
+            connectedClients[lastIdx].width = width
+            connectedClients[lastIdx].height = height
+        }
+
+        // Surface what the local Mac actually switched to. macOS only
+        // exposes a finite set of display modes, so we usually land a few
+        // pixels off from the client request — surfacing both sizes in
+        // the UI lets the user see the relationship.
+        // (Computed below by setResolution; we update connectedClients
+        // again after that.)
+
+        // Step 1: Switch the actual macOS display mode to the closest
+        // match. This makes the local desktop reflow at the new size, so
+        // the captured frames already have the right aspect — no SCKit
+        // letterboxing or stretching needed. The local user sees the
+        // resolution change too; we restore the original mode in stop().
+        let (modeW, modeH) = displayResolutionService.setResolution(
+            width: w, height: h)
+        logToFile("[RDPonMAC] Mode set to \(modeW)x\(modeH) " +
+                  "(client wanted \(w)x\(h))")
+
+        // Reflect the chosen mode back into the UI so the user can see
+        // the request → reality mapping.
+        if let lastIdx = connectedClients.indices.last {
+            connectedClients[lastIdx].modeWidth  = UInt32(modeW)
+            connectedClients[lastIdx].modeHeight = UInt32(modeH)
+        }
+
+        // Step 2: Reconfigure SCStream at the client's *requested* size.
+        // If the macOS mode we picked is slightly off (no exact match in
+        // the available modes), SCKit handles the small final scale.
+        Task.detached { [screenCapture] in
+            await screenCapture.updateConfiguration(width: w, height: h)
+        }
+
+        // Step 3: Mouse-input scaling. We DON'T re-read NSScreen here —
+        // right after CGDisplaySetDisplayMode, NSScreen.frame can lag the
+        // actual mode change by a runloop tick or two, which gives the
+        // input service a stale scale factor and the cursor lands a few
+        // pixels off from where the user is pointing. Instead we use the
+        // mode's logical size (modeW × modeH) directly. CGDisplayBounds
+        // for the primary display always has origin (0, 0), so a synthetic
+        // CGRect(0, 0, modeW, modeH) matches what NSScreen *will* report
+        // once the runloop catches up.
+        let bounds = CGRect(x: 0, y: 0,
+                            width: CGFloat(modeW),
+                            height: CGFloat(modeH))
+        let scale = MonitorService.getPrimaryMonitor()?.scaleFactor ?? 2.0
+        inputInjection.configure(
+            displayBounds: bounds,
+            scaleFactor: scale,
+            remoteWidth: CGFloat(w),
+            remoteHeight: CGFloat(h)
+        )
     }
 
     // MARK: - Clipboard

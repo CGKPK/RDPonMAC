@@ -150,6 +150,23 @@ void rdpmac_update_frame(RDPServerHandle server,
                                rects);
 }
 
+// Forwarder for cursor shape updates. Called from CursorService.swift when
+// NSCursor.current changes.
+void rdpmac_update_pointer(RDPServerHandle server,
+                           const uint8_t* rgba,
+                           uint32_t width, uint32_t height,
+                           uint32_t hotX, uint32_t hotY)
+{
+    if (!server || !rgba || width == 0 || height == 0) {
+        return;
+    }
+    rdpmac_listener* listener = rdp_server_get_listener_internal(server);
+    if (!listener) {
+        return;
+    }
+    rdpmac_listener_push_pointer(listener, rgba, width, height, hotX, hotY);
+}
+
 void rdpmac_notify_update(RDPServerHandle server)
 {
     // Under libxrdp, frame delivery in rdpmac_update_frame is synchronous —

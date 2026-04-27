@@ -34,6 +34,15 @@ typedef void (*RDPUnicodeKeyboardEventCallback)(void* ctx, uint16_t flags, uint1
 typedef void (*RDPMouseEventCallback)(void* ctx, uint16_t flags, uint16_t x, uint16_t y);
 typedef void (*RDPClientConnectCallback)(void* ctx);
 typedef void (*RDPClientDisconnectCallback)(void* ctx);
+// Client (re)negotiated a desktop size. Fires once at up_and_running with
+// the size from ClientCoreData (= the size mstsc/Jump/Windows App
+// requested), and again after any in-session DYNVC Display Control
+// resize. Swift uses this to live-update the SCStream resolution and
+// the input-scaling factors so the captured frame matches what the
+// client is showing pixel-for-pixel.
+typedef void (*RDPClientResolutionCallback)(void* ctx,
+                                            uint32_t width,
+                                            uint32_t height);
 
 typedef struct {
     void* swiftContext;
@@ -44,6 +53,7 @@ typedef struct {
     RDPMouseEventCallback onMouseEvent;
     RDPClientConnectCallback onClientConnect;
     RDPClientDisconnectCallback onClientDisconnect;
+    RDPClientResolutionCallback onClientResolution;
 } RDPMacSubsystemContext;
 
 extern RDPMacSubsystemContext g_macSubsystemContext;
@@ -79,6 +89,15 @@ void rdpmac_update_frame(RDPServerHandle server,
                          uint32_t numRects, const RDPRect* rects);
 void rdpmac_notify_update(RDPServerHandle server);
 bool rdpmac_check_surface(RDPServerHandle server);  // returns true if surface is ready
+
+// Push a new mouse cursor shape to every connected client. `rgba` is
+// top-down RGBA pixel data, width*height*4 bytes. (hotX, hotY) is the
+// hotspot in pixels. Called from CursorService when NSCursor.current
+// changes.
+void rdpmac_update_pointer(RDPServerHandle server,
+                            const uint8_t* rgba,
+                            uint32_t width, uint32_t height,
+                            uint32_t hotX, uint32_t hotY);
 
 // ============================================================
 // Input bridge

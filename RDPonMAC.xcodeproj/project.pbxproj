@@ -25,6 +25,8 @@
 		AA000010 /* MonitorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000010; };
 		AA000011 /* CertificateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000011; };
 		AA000012 /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000012; };
+		AA000050 /* CursorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000050; };
+		AA000052 /* DisplayResolutionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000052; };
 		AA000013 /* RDPSubsystem.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000013; };
 		AA000014 /* RDPServerBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000014; };
 		AA000015 /* RDPInputBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = AB000015; };
@@ -60,6 +62,8 @@
 		AB000010 /* MonitorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorService.swift; sourceTree = "<group>"; };
 		AB000011 /* CertificateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateService.swift; sourceTree = "<group>"; };
 		AB000012 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		AB000050 /* CursorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorService.swift; sourceTree = "<group>"; };
+		AB000052 /* DisplayResolutionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayResolutionService.swift; sourceTree = "<group>"; };
 		AB000013 /* RDPSubsystem.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPSubsystem.c; sourceTree = "<group>"; };
 		AB000014 /* RDPServerBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPServerBridge.c; sourceTree = "<group>"; };
 		AB000015 /* RDPInputBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RDPInputBridge.c; sourceTree = "<group>"; };
@@ -171,6 +175,8 @@
 				AB000010 /* MonitorService.swift */,
 				AB000011 /* CertificateService.swift */,
 				AB000012 /* PermissionService.swift */,
+				AB000050 /* CursorService.swift */,
+				AB000052 /* DisplayResolutionService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -312,6 +318,8 @@
 				AA000010 /* MonitorService.swift in Sources */,
 				AA000011 /* CertificateService.swift in Sources */,
 				AA000012 /* PermissionService.swift in Sources */,
+				AA000050 /* CursorService.swift in Sources */,
+				AA000052 /* DisplayResolutionService.swift in Sources */,
 				AA000013 /* RDPSubsystem.c in Sources */,
 				AA000014 /* RDPServerBridge.c in Sources */,
 				AA000015 /* RDPInputBridge.c in Sources */,

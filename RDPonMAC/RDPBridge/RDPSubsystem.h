@@ -34,6 +34,9 @@ typedef void (*RDPUnicodeKeyboardEventCallback)(void* ctx, uint16_t flags, uint1
 typedef void (*RDPMouseEventCallback)(void* ctx, uint16_t flags, uint16_t x, uint16_t y);
 typedef void (*RDPClientConnectCallback)(void* ctx);
 typedef void (*RDPClientDisconnectCallback)(void* ctx);
+typedef void (*RDPClientResolutionCallback)(void* ctx,
+                                            uint32_t width,
+                                            uint32_t height);
 
 typedef struct {
     void* swiftContext;
@@ -44,6 +47,7 @@ typedef struct {
     RDPMouseEventCallback onMouseEvent;
     RDPClientConnectCallback onClientConnect;
     RDPClientDisconnectCallback onClientDisconnect;
+    RDPClientResolutionCallback onClientResolution;
 } RDPMacSubsystemContext;
 
 extern RDPMacSubsystemContext g_macSubsystemContext;

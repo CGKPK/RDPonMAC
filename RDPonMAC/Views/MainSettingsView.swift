@@ -69,9 +69,40 @@ struct MainSettingsView: View {
                             .italic()
                     } else {
                         ForEach(serverManager.connectedClients) { client in
-                            HStack {
+                            HStack(spacing: 6) {
                                 Image(systemName: "person.fill")
                                 Text(client.clientAddress)
+                                if let w = client.width, let h = client.height {
+                                    // What mstsc/Jump/Windows App
+                                    // requested over DYNVC Display Control.
+                                    Text("\(w)×\(h)")
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(Color.secondary.opacity(0.15)))
+                                }
+                                if let mw = client.modeWidth,
+                                   let mh = client.modeHeight,
+                                   (mw, mh) != (client.width, client.height) {
+                                    // The macOS display mode we actually
+                                    // switched to (closest available match).
+                                    // Hidden when it equals the client
+                                    // request — no need to show twice.
+                                    Image(systemName: "arrow.right")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("Mac \(mw)×\(mh)")
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(Color.blue.opacity(0.15)))
+                                }
                                 Spacer()
                                 Text(client.connectedAt, style: .relative)
                                     .foregroundColor(.secondary)

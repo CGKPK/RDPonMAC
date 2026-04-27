@@ -60,6 +60,7 @@ typedef struct {
     void (*onMouseEvent)(void*, uint16_t, uint16_t, uint16_t);
     void (*onClientConnect)(void*);
     void (*onClientDisconnect)(void*);
+    void (*onClientResolution)(void*, uint32_t, uint32_t);
 } RDPMacSubsystemContext;
 
 extern RDPMacSubsystemContext g_macSubsystemContext;
@@ -107,6 +108,14 @@ struct rdpmac_client {
     // ScreenCaptureKit's (possibly partial) dirty rects and pushes every
     // tile so the placeholder/blue first frame is overwritten promptly.
     atomic_int              needs_full_repaint;
+
+    // DYNVC + Display Control state. `dynvc_started` flips to 1 once we've
+    // called libxrdp_drdynvc_start; `disp_chan_id` is the dynamic channel
+    // ID returned by libxrdp_drdynvc_open for "Microsoft::Windows::RDS::
+    // DisplayControl" (-1 = not yet open). Both are touched only from the
+    // libxrdp client thread, so no atomic discipline is needed.
+    int                     dynvc_started;
+    int                     disp_chan_id;
 
     // Per-client send lock. OpenSSL's SSL_write is NOT thread-safe on a
     // single SSL_CTX/SSL pair: if two threads call SSL_write concurrently,
@@ -693,6 +702,83 @@ rdpmac_listener_push_frame(rdpmac_listener* l,
     pthread_mutex_unlock(&l->clients_mu);
 }
 
+// ----------------------------------------------------------------------------
+// Cursor (pointer) updates — push the current macOS cursor shape to every
+// connected client. Called from CursorService.swift when NSCursor.current
+// changes. Without this, the client renders a stale cursor (typically the
+// system arrow we sent at up_and_running) and the user can't see resize/
+// I-beam/hand cursors that hint at clickable or resizable UI.
+// ----------------------------------------------------------------------------
+
+void
+rdpmac_listener_push_pointer(rdpmac_listener* l,
+                             const uint8_t* rgba,
+                             uint32_t width, uint32_t height,
+                             uint32_t hotX, uint32_t hotY)
+{
+    if (l == NULL || rgba == NULL || width == 0 || height == 0) {
+        return;
+    }
+    // Cap at 96x96 — the largest size supported by RDP_CAPSET_LARGE_POINTER.
+    // Most cursors are 32x32; resize cursors a bit larger.
+    if (width  > 96) width  = 96;
+    if (height > 96) height = 96;
+
+    // libxrdp expects bottom-up BGRA pixel data plus a 1-bpp mask whose bits
+    // run left-to-right within each byte, top-down rows. Rebuild both from
+    // the input top-down RGBA buffer.
+    size_t pix_count = (size_t)width * height;
+    uint8_t bgra[96 * 96 * 4];
+    int mask_stride = ((int)width + 15) / 16 * 2;     // 16-bit aligned per spec
+    uint8_t mask[96 * 16];                            // > worst-case 96/8 * 96
+    memset(mask, 0xFF, sizeof(mask));                 // all-transparent default
+    for (uint32_t y = 0; y < height; y++) {
+        const uint8_t* src_row = rgba + (size_t)y * width * 4;
+        // Bottom-up destination row for the BGRA buffer libxrdp emits.
+        uint8_t* dst_row = bgra + (size_t)(height - 1 - y) * width * 4;
+        uint8_t* mask_row = mask + (size_t)y * mask_stride;
+        for (uint32_t x = 0; x < width; x++) {
+            uint8_t r = src_row[x*4 + 0];
+            uint8_t g = src_row[x*4 + 1];
+            uint8_t b = src_row[x*4 + 2];
+            uint8_t a = src_row[x*4 + 3];
+            dst_row[x*4 + 0] = b;
+            dst_row[x*4 + 1] = g;
+            dst_row[x*4 + 2] = r;
+            dst_row[x*4 + 3] = a;
+            // 1-bpp AND-mask: 0 = pixel is part of cursor, 1 = transparent.
+            // We treat any pixel with alpha < 128 as transparent.
+            int byte_idx = x / 8;
+            int bit_idx  = 7 - (x % 8);
+            if (a >= 128) {
+                mask_row[byte_idx] &= (uint8_t)~(1 << bit_idx);
+            }
+        }
+    }
+    (void)pix_count;
+
+    pthread_mutex_lock(&l->clients_mu);
+    for (rdpmac_client* c = l->clients; c != NULL; c = c->next) {
+        if (!atomic_load(&c->up_and_running) || c->session == NULL) {
+            continue;
+        }
+        pthread_mutex_lock(&c->send_mu);
+        // cache_idx 0 — overwrites the same cache slot. Modern clients
+        // accept this; older ones may need a per-shape cache_idx, which
+        // we'll add only if this proves insufficient.
+        int rv = libxrdp_send_pointer(c->session, /*cache_idx*/ 0,
+                                      (char*)bgra, (char*)mask,
+                                      (int)hotX, (int)hotY,
+                                      /*bpp*/ 32,
+                                      (int)width, (int)height);
+        pthread_mutex_unlock(&c->send_mu);
+        if (rv != 0) {
+            rdpmac_log("[xRDP] push_pointer: libxrdp_send_pointer rv=%d\n", rv);
+        }
+    }
+    pthread_mutex_unlock(&l->clients_mu);
+}
+
 // ============================================================================
 // Listener thread — accepts incoming connections
 // ============================================================================
@@ -762,6 +848,8 @@ on_new_connection_callback(struct trans* self, struct trans* new_self)
     atomic_init(&client->should_stop, 0);
     atomic_init(&client->up_and_running, 0);
     atomic_init(&client->needs_full_repaint, 0);
+    client->dynvc_started = 0;
+    client->disp_chan_id  = -1;
     {
         // Recursive mutex: the client thread enters trans_check_wait_objs while
         // holding send_mu; libxrdp may invoke our session callback (e.g. on
@@ -1054,6 +1142,213 @@ client_on_data_in(struct trans* self)
     return 0;
 }
 
+// ----------------------------------------------------------------------------
+// DYNVC + Display Control (MS-RDPEDISP) — lets mstsc/Jump/Windows App tell us
+// "the user just resized my window, please re-negotiate the desktop at the
+// new pixel size". We open the dynamic channel
+// "Microsoft::Windows::RDS::DisplayControl" once, send a CAPS PDU declaring
+// our limits, and then translate any incoming MONITOR_LAYOUT PDU into a
+// client_info update + libxrdp_reset(). The reset triggers a Deactivate-All
+// → Demand Active cycle which fires our up_and_running handler again with
+// the new size, which already routes through onClientResolution → Swift,
+// which live-updates SCStream and the input scaling.
+// ----------------------------------------------------------------------------
+
+#define DISPLAYCONTROL_PDU_TYPE_MONITOR_LAYOUT  0x00000002
+#define DISPLAYCONTROL_PDU_TYPE_CAPS            0x00000005
+#define DISPLAYCONTROL_MONITOR_PRIMARY          0x00000001
+
+#define DISPLAYCONTROL_NAME "Microsoft::Windows::RDS::DisplayControl"
+
+// Pack `v` as 4-byte little-endian into `dst`.
+static inline void put_u32_le(uint8_t* dst, uint32_t v) {
+    dst[0] = (uint8_t)(v        & 0xFF);
+    dst[1] = (uint8_t)((v >>  8) & 0xFF);
+    dst[2] = (uint8_t)((v >> 16) & 0xFF);
+    dst[3] = (uint8_t)((v >> 24) & 0xFF);
+}
+// Read 4-byte little-endian from `src`.
+static inline uint32_t get_u32_le(const uint8_t* src) {
+    return (uint32_t)src[0]
+         | ((uint32_t)src[1] <<  8)
+         | ((uint32_t)src[2] << 16)
+         | ((uint32_t)src[3] << 24);
+}
+
+// Send the server-to-client DISPLAYCONTROL_CAPS_PDU: 8-byte header + 12-byte
+// body advertising max 1 monitor up to 8192×8192. Most clients ignore the
+// values and just accept any layout, but mstsc requires the message before
+// it sends a MONITOR_LAYOUT.
+static int
+disp_send_caps(rdpmac_client* client)
+{
+    uint8_t buf[20];
+    put_u32_le(buf + 0,  DISPLAYCONTROL_PDU_TYPE_CAPS);   // Type
+    put_u32_le(buf + 4,  20);                              // Length
+    put_u32_le(buf + 8,  1);                               // MaxNumMonitors
+    put_u32_le(buf + 12, 8192);                            // MaxMonitorAreaFactorA
+    put_u32_le(buf + 16, 8192);                            // MaxMonitorAreaFactorB
+    return libxrdp_drdynvc_data(client->session,
+                                client->disp_chan_id,
+                                (const char*)buf, sizeof(buf));
+}
+
+static int
+disp_open_response(intptr_t id, int chan_id, int creation_status)
+{
+    rdpmac_client* client = (rdpmac_client*)id;
+    rdpmac_log("[xRDP] DisplayControl channel open response: chan=%d "
+               "status=%d\n", chan_id, creation_status);
+    if (!client) return 0;
+    if (creation_status != 0) {
+        // Client doesn't support DisplayControl (or refused). Disable.
+        client->disp_chan_id = -1;
+        return 0;
+    }
+    int rv = disp_send_caps(client);
+    rdpmac_log("[xRDP] DisplayControl caps sent rv=%d\n", rv);
+    return 0;
+}
+
+static int
+disp_close_response(intptr_t id, int chan_id)
+{
+    rdpmac_client* client = (rdpmac_client*)id;
+    rdpmac_log("[xRDP] DisplayControl channel closed (chan=%d)\n", chan_id);
+    if (client && client->disp_chan_id == chan_id) {
+        client->disp_chan_id = -1;
+    }
+    return 0;
+}
+
+static int
+disp_data_first(intptr_t id, int chan_id, char* data,
+                int bytes, int total_bytes)
+{
+    // DisplayControl messages are small (≤80 bytes for a single-monitor
+    // layout, growing linearly per monitor). They normally arrive in one
+    // shot; if we ever see fragmentation we'd need a per-channel reassembly
+    // buffer. For now log + ignore.
+    (void)id; (void)chan_id; (void)data;
+    rdpmac_log("[xRDP] DisplayControl data_first %d/%d bytes — "
+               "fragmented messages not supported, dropping\n",
+               bytes, total_bytes);
+    return 0;
+}
+
+static int
+disp_data(intptr_t id, int chan_id, char* data, int bytes)
+{
+    rdpmac_client* client = (rdpmac_client*)id;
+    (void)chan_id;
+    if (!client || !client->session || !client->session->client_info) {
+        return 0;
+    }
+    if (bytes < 8) {
+        rdpmac_log("[xRDP] DisplayControl data too short: %d\n", bytes);
+        return 0;
+    }
+
+    const uint8_t* p = (const uint8_t*)data;
+    uint32_t type = get_u32_le(p + 0);
+    uint32_t len  = get_u32_le(p + 4);
+    (void)len;
+
+    if (type != DISPLAYCONTROL_PDU_TYPE_MONITOR_LAYOUT) {
+        // CAPS PDUs are server→client only — we don't expect to receive one.
+        rdpmac_log("[xRDP] DisplayControl unexpected PDU type=0x%x len=%u\n",
+                   type, len);
+        return 0;
+    }
+
+    // Body of MONITOR_LAYOUT_PDU (after the 8-byte header):
+    //   u32 MonitorLayoutSize  (must be 40)
+    //   u32 NumMonitors
+    //   { 40-byte monitor records } * NumMonitors
+    if (bytes < 8 + 8 + 40) {
+        rdpmac_log("[xRDP] MONITOR_LAYOUT body too short: %d\n", bytes);
+        return 0;
+    }
+    uint32_t monitor_layout_size = get_u32_le(p + 8);
+    uint32_t num_monitors        = get_u32_le(p + 12);
+    if (monitor_layout_size != 40 || num_monitors == 0) {
+        rdpmac_log("[xRDP] MONITOR_LAYOUT bad: layoutSize=%u num=%u\n",
+                   monitor_layout_size, num_monitors);
+        return 0;
+    }
+
+    // Walk the monitor records, prefer the one flagged primary; fall back
+    // to the first monitor.
+    uint32_t new_w = 0, new_h = 0;
+    bool got_primary = false;
+    const uint8_t* m = p + 16;
+    for (uint32_t i = 0; i < num_monitors; i++) {
+        if ((size_t)(m - p) + 40 > (size_t)bytes) break;
+        uint32_t flags  = get_u32_le(m + 0);
+        // m+4..7 = Left, m+8..11 = Top
+        uint32_t width  = get_u32_le(m + 12);
+        uint32_t height = get_u32_le(m + 16);
+        // physical_w/h, orientation, scale factors at +20..+39 — unused.
+        if (!got_primary) {
+            new_w = width;
+            new_h = height;
+        }
+        if (flags & DISPLAYCONTROL_MONITOR_PRIMARY) {
+            new_w = width;
+            new_h = height;
+            got_primary = true;
+            break;
+        }
+        m += 40;
+    }
+
+    // Sanity-clamp: MS-RDPEDISP says 200..8192, RDP libxrdp side has the
+    // same bounds. Reject out-of-range to avoid feeding garbage to reset.
+    if (new_w < 200 || new_h < 200 ||
+        new_w > 8192 || new_h > 8192) {
+        rdpmac_log("[xRDP] MONITOR_LAYOUT size out of range %ux%u — ignoring\n",
+                   new_w, new_h);
+        return 0;
+    }
+
+    struct xrdp_client_info* ci = client->session->client_info;
+    if (new_w == ci->display_sizes.session_width &&
+        new_h == ci->display_sizes.session_height) {
+        // Same size — nothing to do. Some clients re-send the same layout
+        // multiple times during a single drag.
+        return 0;
+    }
+
+    rdpmac_log("[xRDP] MONITOR_LAYOUT %ux%u → %ux%u; resetting session\n",
+               ci->display_sizes.session_width,
+               ci->display_sizes.session_height,
+               new_w, new_h);
+
+    // Update client_info BEFORE libxrdp_reset — the new Demand Active that
+    // reset emits reads session_width/height straight out of client_info.
+    ci->display_sizes.session_width  = new_w;
+    ci->display_sizes.session_height = new_h;
+
+    atomic_store(&client->needs_full_repaint, 1);
+    int rv = libxrdp_reset(client->session);
+    rdpmac_log("[xRDP] libxrdp_reset rv=%d (new size %ux%u)\n",
+               rv, new_w, new_h);
+    // libxrdp_reset triggers a fresh Deactivate-All → Demand Active cycle.
+    // The client's response (TS_FONT_LIST_PDU) re-fires our up_and_running
+    // handler with the new client_info, which calls onClientResolution →
+    // Swift live-updates SCStream and input scaling. Capture stays running
+    // through the reset; the next frame from SCStream just arrives at the
+    // new dimensions.
+    return 0;
+}
+
+static struct xrdp_drdynvc_procs disp_procs = {
+    .open_response  = disp_open_response,
+    .close_response = disp_close_response,
+    .data_first     = disp_data_first,
+    .data           = disp_data,
+};
+
 // libxrdp's session callback — input events and lifecycle notifications.
 // Forwarded into the Swift bridge via g_macSubsystemContext.
 static int
@@ -1105,11 +1400,14 @@ client_xrdp_callback(intptr_t id, int msg,
                 struct xrdp_client_info* ci = client->session->client_info;
                 rdpmac_log("[xRDP] caps: bpp=%d use_bitmap_comp=%d "
                            "use_bitmap_cache=%d use_fast_path=%d "
-                           "rfx=%d jpeg=%d h264=%d gfx=%d\n",
+                           "rfx=%d jpeg=%d h264=%d gfx=%d "
+                           "desktop=%ux%u\n",
                            ci->bpp, ci->use_bitmap_comp, ci->use_bitmap_cache,
                            ci->use_fast_path, ci->rfx_codec_id,
                            ci->jpeg_codec_id, ci->h264_codec_id,
-                           ci->use_bulk_comp);
+                           ci->use_bulk_comp,
+                           ci->display_sizes.session_width,
+                           ci->display_sizes.session_height);
                 atomic_store(&client->up_and_running, 1);
                 atomic_store(&client->needs_full_repaint, 1);
                 pthread_mutex_lock(&client->send_mu);
@@ -1117,6 +1415,51 @@ client_xrdp_callback(intptr_t id, int msg,
 
                 pthread_mutex_unlock(&client->send_mu);
                 rdpmac_log("[xRDP] sent system pointer rv=%d\n", prv);
+
+                // Notify Swift of the negotiated desktop resolution so it
+                // can downsample the ScreenCaptureKit output to match. The
+                // client is already locked into ci->display_sizes.session_*
+                // — libxrdp advertised those in Demand Active and the
+                // client accepted in Confirm Active. Sending tiles outside
+                // that surface gets clipped/discarded, so we may as well
+                // capture at the right size.
+                uint32_t cw = ci->display_sizes.session_width;
+                uint32_t ch = ci->display_sizes.session_height;
+                if (g_macSubsystemContext.onClientResolution &&
+                    g_macSubsystemContext.swiftContext &&
+                    cw > 0 && ch > 0) {
+                    g_macSubsystemContext.onClientResolution(
+                        g_macSubsystemContext.swiftContext,
+                        cw, ch);
+                }
+
+                // Bring up DYNVC (the static "drdynvc" channel that hosts
+                // dynamic virtual channels) and open the DisplayControl
+                // dynamic channel so the client can tell us about live
+                // window resizes. Only do this once per connection — every
+                // libxrdp_reset re-fires up_and_running, but DYNVC stays
+                // up and we don't want to re-open the channel.
+                if (!client->dynvc_started) {
+                    int dvc_rv = libxrdp_drdynvc_start(client->session);
+                    rdpmac_log("[xRDP] libxrdp_drdynvc_start rv=%d\n", dvc_rv);
+                    if (dvc_rv == 0) {
+                        client->dynvc_started = 1;
+                        int chan = -1;
+                        int oo_rv = libxrdp_drdynvc_open(client->session,
+                                                         DISPLAYCONTROL_NAME,
+                                                         0,
+                                                         &disp_procs,
+                                                         &chan);
+                        rdpmac_log("[xRDP] DisplayControl open rv=%d "
+                                   "chan=%d\n", oo_rv, chan);
+                        if (oo_rv == 0) {
+                            client->disp_chan_id = chan;
+                            // disp_open_response will fire when the client
+                            // accepts the create request, and it sends the
+                            // CAPS PDU from there.
+                        }
+                    }
+                }
             }
             break;
 

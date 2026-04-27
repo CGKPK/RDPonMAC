@@ -61,6 +61,11 @@ final class ScreenCaptureService: NSObject {
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(frameRate))
         config.showsCursor = false
         config.queueDepth = 3
+        // We aspect-match by switching the actual macOS display mode in
+        // DisplayResolutionService whenever the client renegotiates a
+        // size, so SCKit's default (preservesAspectRatio = true) produces
+        // pixel-perfect output — the source aspect already matches the
+        // target buffer because the macOS desktop just reflowed to it.
 
         // Audio capture configuration
         config.capturesAudio = true
@@ -138,6 +143,36 @@ final class ScreenCaptureService: NSObject {
         self.stream = nil
         self.isCapturing = false
         self.previousFrameData = nil
+    }
+
+    /// Live-resize the capture stream to a new output resolution. The
+    /// connected RDP client negotiated `width`x`height` as the desktop
+    /// size, so ScreenCaptureKit downsamples the native display into a
+    /// buffer of exactly that size — no client-side scrollbars or
+    /// letterboxing. SCStream supports updateConfiguration without a
+    /// stop/start cycle, so capture isn't interrupted.
+    func updateConfiguration(width: Int, height: Int) async {
+        guard let stream = stream else { return }
+        guard width > 0, height > 0 else { return }
+
+        let config = SCStreamConfiguration()
+        config.width = width
+        config.height = height
+        config.pixelFormat = kCVPixelFormatType_32BGRA
+        config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(frameRate))
+        config.showsCursor = false
+        config.queueDepth = 3
+        config.capturesAudio = true
+        config.sampleRate = 48000
+        config.channelCount = 2
+        do {
+            try await stream.updateConfiguration(config)
+        } catch {
+            // Best-effort: if the live update fails the client just keeps
+            // seeing the previous size (still usable), so we don't tear
+            // down capture.
+            NSLog("[ScreenCaptureService] updateConfiguration failed: \(error)")
+        }
     }
 
     var capturing: Bool { isCapturing }
